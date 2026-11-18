@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark">
+<title>SHYL-WJ86 微机原理接口实验箱 · 在线模拟</title>
+<link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">
+    <div class="brand-mark">SHYL<span>WJ86</span></div>
+    <div class="brand-text">
+      <h1>新型微机原理接口实验系统实验箱</h1>
+      <p>在线模拟 · 8086 实模式 · 8253 / 8255 / 8259 / DAC0832 / ADC0809</p>
+    </div>
+  </div>
+  <div class="run-controls">
+    <div class="status-pill" id="statusPill"><i></i><span id="statusText">待机</span></div>
+    <label class="mini-field">CPU
+      <select id="cpuSel">
+        <option value="2000000">2 MHz</option>
+        <option value="4000000" selected>4 MHz</option>
+        <option value="8000000">8 MHz</option>
+        <option value="16000000">16 MHz</option>
+        <option value="33000000">33 MHz</option>
+      </select>
+    </label>
+    <label class="mini-field">速度
+      <select id="speedSel">
+        <option value="0.25">0.25×</option>
+        <option value="0.5">0.5×</option>
+        <option value="1" selected>1×</option>
+        <option value="2">2×</option>
+        <option value="4">4×</option>
+      </select>
+    </label>
+    <button class="btn primary" id="btnRun" title="Ctrl+Enter">▶ 汇编并运行</button>
+    <button class="btn" id="btnPause" disabled>暂停</button>
+    <button class="btn" id="btnReset" disabled>复位</button>
+  </div>
+</header>
+
+<main class="workspace">
+
+  <section class="panel board-panel">
+    <div class="panel-head">
+      <h2>实验箱面板</h2>
+      <span class="panel-sub" id="boardSub">等待程序运行</span>
+    </div>
+
+    <div class="board">
+
+      <div class="board-row top-row">
+        <div class="module matrix-module">
+          <div class="module-head"><span>8×8 LED 点阵</span><span class="tag" id="matrixTag">PA=行 / PB=列</span></div>
+          <div class="matrix" id="matrix" aria-label="8×8 LED 点阵"></div>
+          <div class="module-foot">红色，逐列扫描</div>
+        </div>
+
+        <div class="module display-module">
+          <div class="module-head"><span>8 位数码管</span><span class="tag" id="segTag">共阴 / 段高有效</span></div>
+          <div class="digits" id="digits"></div>
+          <div class="module-foot" id="segFoot">PA0~PA7=段码，PC0~PC7=位选</div>
+        </div>
+      </div>
+
+      <div class="board-row mid-row">
+        <div class="module led-module">
+          <div class="module-head"><span>发光二极管</span><span class="tag">PB0~PB7 · 高电平点亮</span></div>
+          <div class="leds" id="leds"></div>
+          <div class="module-foot" id="ledFoot">L1 … L8</div>
+        </div>
+
+        <div class="module switch-module">
+          <div class="module-head"><span>逻辑开关 / 单脉冲</span><span class="tag">K1~K12</span></div>
+          <div class="switches" id="switches"></div>
+          <div class="pulse-row">
+            <button class="pulse" id="an1" title="接 CLK0 时产生一个计数脉冲">AN1 单脉冲</button>
+            <button class="pulse" id="an2" title="接 IRQ2 时产生一次中断">AN2 单脉冲</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="board-row analog-row">
+        <div class="module adc-module">
+          <div class="module-head"><span>ADC0809 模拟输入</span><span class="tag">IN0 · 0~5 V</span></div>
+          <div class="analog-body">
+            <div class="analog-line">
+              <span>IN0</span>
+              <input type="range" id="adcRange" min="0" max="5" step="0.01" value="2.5">
+              <b id="adcVolt">2.50 V</b>
+            </div>
+            <div class="analog-meta">转换结果 <span id="adcCode">80H</span> · <span id="adcState">就绪</span></div>
+          </div>
+        </div>
+
+        <div class="module dac-module">
+          <div class="module-head"><span>DAC0832 模拟输出</span><span class="tag">双极性 −5~+5 V</span></div>
+          <div class="analog-body">
+            <div class="dac-readout"><b id="dacVolt">−5.00 V</b><span id="dacCode">N = 00H</span></div>
+            <div class="dac-bar"><i id="dacFill"></i><em></em></div>
+            <div class="analog-meta">DAOUT → 万用表 / 示波器</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="module scope-module">
+        <div class="module-head">
+          <span>虚拟示波器</span>
+          <span class="scope-legend">
+            <i class="c0"></i>OUT0
+            <i class="c1"></i>OUT1
+            <i class="c2"></i>OUT2
+            <i class="c3"></i>IRQ0
+          </span>
+          <label class="mini-field scope-base">时基
+            <select id="scopeBase">
+              <option value="0.001">1 ms</option>
+              <option value="0.01">10 ms</option>
+              <option value="0.05" selected>50 ms</option>
+              <option value="0.2">200 ms</option>
+              <option value="1">1 s</option>
+              <option value="5">5 s</option>
+            </select>
+          </label>
+        </div>
+        <canvas id="scopeCanvas"></canvas>
+      </div>
+
+    </div>
+  </section>
+
+  <aside class="panel side-panel">
+    <nav class="tabbar" role="tablist">
+      <button class="tab active" data-tab="code">程序</button>
+      <button class="tab" data-tab="regs">寄存器</button>
+      <button class="tab" data-tab="chips">芯片</button>
+      <button class="tab" data-tab="wire">接线</button>
+      <button class="tab" data-tab="help">说明</button>
+    </nav>
+
+    <div class="tabpanes">
+
+      <section class="tabpane active" id="pane-code">
+        <div class="code-toolbar">
+          <select id="sampleSel" title="载入内置例程">
+            <option value="">载入示例…</option>
+          </select>
+          <button class="btn small" id="btnOpen">打开 .ASM</button>
+          <button class="btn small" id="btnSave">保存</button>
+          <input type="file" id="fileInput" accept=".asm,.txt,.inc" hidden>
+        </div>
+        <div class="editor-shell">
+          <div class="gutter" id="gutter">1</div>
+          <textarea id="editor" spellcheck="false" wrap="off" autocomplete="off" autocapitalize="off"></textarea>
+        </div>
+        <div class="errors" id="errors"></div>
+        <div class="console-block">
+          <div class="console-head"><span>输出 / 日志</span><button class="link-btn" id="btnClearLog">清空</button></div>
+          <pre id="console"></pre>
+        </div>
+      </section>
+
+      <section class="tabpane" id="pane-regs">
+        <div class="reg-grid" id="regGrid"></div>
+        <div class="flag-row" id="flagRow"></div>
+        <div class="reg-note" id="ipInfo">尚未运行</div>
+      </section>
+
+      <section class="tabpane" id="pane-chips">
+        <div class="chip-cards" id="chipCards"></div>
+      </section>
+
+      <section class="tabpane" id="pane-wire">
+        <p class="pane-tip">按实验指导书接线。修改立即生效；复位后保留。</p>
+        <div class="wire-form" id="wireForm"></div>
+      </section>
+
+      <section class="tabpane" id="pane-help">
+        <div class="help">
+          <h3>三步上手</h3>
+          <ol>
+            <li>在“程序”页粘贴或打开 <code>.ASM</code>（支持 UTF-8 / GBK 编码）。</li>
+            <li>点右上角 <b>汇编并运行</b>（Ctrl+Enter）。</li>
+            <li>看面板：数码管、LED、点阵、万用表、示波器会随程序变化。</li>
+          </ol>
+
+          <h3>默认端口与接线</h3>
+          <table class="help-table">
+            <tr><th>器件</th><th>端口</th><th>默认接线</th></tr>
+            <tr><td>8253</td><td>200H~203H</td><td>1MHz→CLK0，GATE=+5V，OUT0→IRQ0</td></tr>
+            <tr><td>8255</td><td>210H~213H</td><td>PA=段码/行，PB=LED/列，PC=位选</td></tr>
+            <tr><td>8259</td><td>230H/231H</td><td>IRQ1←0809 EOC，IRQ2←AN2</td></tr>
+            <tr><td>DAC0832</td><td>250H</td><td>U = 10·N/256 − 5（V）</td></tr>
+            <tr><td>ADC0809</td><td>260H~267H</td><td>IN0 ← 面板电位器 0~5V</td></tr>
+          </table>
+
+          <p class="help-note">K1~K8 同时接到 8255 的 PA/PB/PC 输入：把对应口设为输入后，</p>
+          <p class="help-note">开关状态会出现在该口上；K1~K4 还可作为 8253 的 GATE 来源。</p>
+
+          <h3>数码管位序</h3>
+          <p>考试模板按 <b>PC0 最右</b> 编写；部分实验代码按 <b>PC0 最左</b> 编写。若显示左右颠倒，到“接线”页勾选
+            <b>数码管位序反转</b>。内置示例已按各自代码设置。</p>
+
+          <h3>汇编器范围</h3>
+          <p>支持 MASM 常用子集：<code>.MODEL SMALL</code>、<code>.486</code> 完整段、<code>PROC/ENDP</code>、
+            <code>EQU</code>、<code>DB/DW/DUP</code>、常用 8086 指令与 <code>INT 21H</code> 的 09H/02H/4CH。
+            不支持 32 位指令、保护模式、宏和外部链接。</p>
+
+          <h3>仿真约定</h3>
+          <p>CPU 按指令周期折算运行；8253 时钟、8259 边沿、0809 转换 100 µs、数码管/点阵按扫描余辉显示。
+            软件延时循环的绝对时间会随 CPU 主频变化，可调整右上角 CPU 频率。</p>
+
+          <h3>键盘</h3>
+          <p><code>Ctrl+Enter</code> 汇编并运行 · <code>F5</code> 暂停/继续 · <code>Ctrl+R</code> 复位</p>
+        </div>
+      </section>
+
+    </div>
+  </aside>
+</main>
+
+<script src="js/util.js"></script>
+<script src="js/assembler.js"></script>
+<script src="js/cpu.js"></script>
+<script src="js/chips.js"></script>
+<script src="js/system.js"></script>
+<script src="js/samples.js"></script>
+<script src="js/ui.js"></script>
+</body>
+</html>
