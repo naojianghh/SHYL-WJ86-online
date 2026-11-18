@@ -105,6 +105,7 @@
   let faultReported = false;
 
   let editor, gutter, consoleEl, errorsEl, sampleSel, statusPill, statusText;
+  let fileNameEl, fileStateEl, fileLineEl;
   let digitEls = [];
   let matrixCells = [];
   let ledEls = [];
@@ -113,6 +114,14 @@
   let workspaceEl, sideEl, colSplitterEl, rowSplitterEl, consoleBlockEl, codePaneEl;
   let layoutSide = 430, layoutConsole = 92;
   let layoutWrap = false;
+  let currentHandle = null;
+  let currentName = '未命名.asm';
+  let currentEncoding = 'utf-8';
+  let currentNewline = '\n';
+  let fileKind = 'sample';
+  let dirty = false;
+  let baseTitle = '';
+  const ASM_TYPES = [{ description: '汇编源文件', accept: { 'text/plain': ['.asm', '.inc', '.txt'] } }];
   const LAYOUT_KEY = 'shyl.layout.v1';
 
   /* ------------------------------------------------------------------ */
@@ -506,6 +515,145 @@
     updateGutter();
   }
 
+  /* ------------------------------------------------------------------ */
+  /* 本地文件：直接保存 / 另存为                                        */
+  /* ------------------------------------------------------------------ */
+  function refreshFileUI() {
+    if (!fileNameEl) return;
+    let state;
+    if (dirty) state = '未保存的修改';
+    else if (fileKind === 'sample') state = '示例';
+    else if (fileKind === 'downloaded') state = '已下载副本';
+    else if (currentHandle) state = '已保存';
+    else state = '已打开 · 另存为';
+    fileNameEl.textContent = currentName;
+    fileNameEl.title = currentName;
+    fileStateEl.textContent = state;
+    fileLineEl.classList.toggle('dirty', dirty);
+    document.title = (dirty ? '● ' : '') + baseTitle;
+  }
+
+  function setFileContext(name, kind, handle, encoding, newline) {
+    currentName = name || '未命名.asm';
+    fileKind = kind || 'file';
+    currentHandle = handle || null;
+    currentEncoding = encoding === 'gbk' ? 'gbk' : 'utf-8';
+    currentNewline = newline === '\r\n' ? '\r\n' : '\n';
+    dirty = false;
+    refreshFileUI();
+  }
+
+  function editorTextForSave() {
+    const text = editor.value;
+    return currentNewline === '\r\n'
+      ? text.replace(/\r\n|\n/g, '\r\n')
+      : text.replace(/\r\n|\n/g, '\n');
+  }
+
+  function markDirty() {
+    if (dirty) return;
+    dirty = true;
+    refreshFileUI();
+  }
+
+  async function loadFileFromHandle(handle) {
+    const file = await handle.getFile();
+    const buffer = await file.arrayBuffer();
+    const dec = U.decodeSourceEx(buffer);
+    setEditorText(dec.text);
+    showErrors([]);
+    setFileContext(file.name, 'file', handle, dec.encoding, dec.text.includes('\r\n') ? '\r\n' : '\n');
+    logLine('── 已打开：' + file.name + '（' + (dec.encoding === 'gbk' ? 'GBK' : 'UTF-8') + '）──');
+  }
+
+  async function openFile() {
+    if (dirty && !confirm('当前修改尚未保存，继续打开会丢失。是否继续？')) return;
+    if (window.showOpenFilePicker) {
+      try {
+        const handles = await window.showOpenFilePicker({ types: ASM_TYPES, multiple: false });
+        if (handles && handles[0]) { await loadFileFromHandle(handles[0]); return; }
+      } catch (e) {
+        if (e && e.name === 'AbortError') return;
+        logLine('[提示] 文件选择器不可用：' + (e && e.message ? e.message : e) + '，改用普通打开。');
+      }
+    }
+    $('#fileInput').click();
+  }
+
+  async function verifyPermission(handle) {
+    const opts = { mode: 'readwrite' };
+    try {
+      if (typeof handle.queryPermission !== 'function') return true;
+      if (await handle.queryPermission(opts) === 'granted') return true;
+      if (await handle.requestPermission(opts) === 'granted') return true;
+    } catch (e) { /* 没有权限 */ }
+    return false;
+  }
+
+  async function writeHandle(handle) {
+    const data = U.encodeSource(editorTextForSave(), currentEncoding);
+    const writable = await handle.createWritable();
+    await writable.write(data);
+    await writable.close();
+  }
+
+  async function saveFile() {
+    if (currentHandle) {
+      try {
+        if (await verifyPermission(currentHandle)) {
+          await writeHandle(currentHandle);
+          dirty = false;
+          fileKind = 'file';
+          refreshFileUI();
+          logLine('✓ 已保存到 ' + currentName + '（' + (currentEncoding === 'gbk' ? 'GBK' : 'UTF-8') + '）');
+          return;
+        }
+        logLine('[提示] 原文件没有写入权限，改为“另存为”。');
+      } catch (e) {
+        logLine('[提示] 直接保存失败：' + (e && e.message ? e.message : e) + '，改为“另存为”。');
+      }
+    }
+    await saveAsFile();
+  }
+
+  async function saveAsFile() {
+    if (window.showSaveFilePicker) {
+      try {
+        const handle = await window.showSaveFilePicker({
+          suggestedName: currentName || 'program.asm',
+          types: ASM_TYPES
+        });
+        await writeHandle(handle);
+        currentHandle = handle;
+        currentName = handle.name || currentName;
+        dirty = false;
+        fileKind = 'file';
+        refreshFileUI();
+        logLine('✓ 已另存为 ' + currentName + '（' + (currentEncoding === 'gbk' ? 'GBK' : 'UTF-8') + '）');
+        return;
+      } catch (e) {
+        if (e && e.name === 'AbortError') return;
+        logLine('[提示] 另存为失败：' + (e && e.message ? e.message : e) + '，改用下载。');
+      }
+    }
+    downloadFile();
+  }
+
+  function downloadFile() {
+    const data = U.encodeSource(editorTextForSave(), currentEncoding);
+    const blob = new Blob([data], { type: 'application/octet-stream' });
+    const a = document.createElement('a');
+    const name = currentName || 'program.asm';
+    a.href = URL.createObjectURL(blob);
+    a.download = name;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+    dirty = false;
+    fileKind = 'downloaded';
+    refreshFileUI();
+    logLine('✓ 已下载 ' + name + '（浏览器不支持直接写文件，保存的是副本）');
+  }
+
   function jumpToLine(n) {
     const lines = editor.value.split('\n');
     n = Math.max(1, Math.min(lines.length, n));
@@ -870,6 +1018,7 @@
   /* 初始化                                                             */
   /* ------------------------------------------------------------------ */
   function init() {
+    baseTitle = document.title;
     editor = $('#editor');
     gutter = $('#gutter');
     consoleEl = $('#console');
@@ -877,6 +1026,9 @@
     sampleSel = $('#sampleSel');
     statusPill = $('#statusPill');
     statusText = $('#statusText');
+    fileNameEl = $('#fileName');
+    fileStateEl = $('#fileState');
+    fileLineEl = $('#fileLine');
     scopeCanvas = $('#scopeCanvas');
     scopeCtx = scopeCanvas.getContext('2d');
     scopeBaseSel = $('#scopeBase');
@@ -909,7 +1061,7 @@
       });
     });
 
-    editor.addEventListener('input', updateGutter);
+    editor.addEventListener('input', () => { updateGutter(); markDirty(); });
     editor.addEventListener('scroll', () => { gutter.scrollTop = editor.scrollTop; });
     editor.addEventListener('keydown', e => {
       if (e.key === 'Tab') {
@@ -931,7 +1083,12 @@
     sampleSel.addEventListener('change', () => {
       const s = samples.find(x => x.id === sampleSel.value);
       if (!s) return;
+      if (dirty && !confirm('当前修改尚未保存，载入示例会丢失。是否继续？')) {
+        sampleSel.value = '';
+        return;
+      }
       setEditorText(s.source);
+      setFileContext(s.id + '.asm', 'sample', null, 'utf-8', s.source.includes('\r\n') ? '\r\n' : '\n');
       sys.applySampleWiring(s.wiring || {});
       syncWireUI();
       updateBoardTags();
@@ -944,16 +1101,19 @@
     $('#btnRun').addEventListener('click', assembleAndRun);
     $('#btnPause').addEventListener('click', togglePause);
     $('#btnReset').addEventListener('click', resetMachine);
-    $('#btnOpen').addEventListener('click', () => $('#fileInput').click());
+    $('#btnOpen').addEventListener('click', openFile);
     $('#fileInput').addEventListener('change', e => {
       const f = e.target.files && e.target.files[0];
       if (!f) return;
       const reader = new FileReader();
       reader.onload = () => {
         try {
-          const text = U.decodeSource(reader.result);
-          setEditorText(text);
-          logLine('── 已载入文件：' + f.name + ' ──');
+          const dec = U.decodeSourceEx(reader.result);
+          setEditorText(dec.text);
+          showErrors([]);
+          setFileContext(f.name, 'file', null, dec.encoding, dec.text.includes('\r\n') ? '\r\n' : '\n');
+          logLine('── 已打开：' + f.name + '（' + (dec.encoding === 'gbk' ? 'GBK' : 'UTF-8') + '）──');
+          logLine('   普通打开拿不到写入句柄：点“保存”会另存为；要直接覆盖原文件，请用“打开 .ASM”的文件选择器。');
           $('#btnRun').focus();
         } catch (err) {
           logLine('✗ 读取文件失败：' + err.message);
@@ -962,14 +1122,8 @@
       reader.readAsArrayBuffer(f);
       e.target.value = '';
     });
-    $('#btnSave').addEventListener('click', () => {
-      const blob = new Blob([editor.value], { type: 'text/plain;charset=utf-8' });
-      const a = document.createElement('a');
-      a.href = URL.createObjectURL(blob);
-      a.download = 'program.asm';
-      a.click();
-      setTimeout(() => URL.revokeObjectURL(a.href), 2000);
-    });
+    $('#btnSave').addEventListener('click', saveFile);
+    $('#btnSaveAs').addEventListener('click', saveAsFile);
     $('#btnClearLog').addEventListener('click', () => { uiLog = ''; consoleEl.textContent = ''; });
 
     $('#cpuSel').addEventListener('change', e => {
@@ -983,6 +1137,10 @@
     // 快捷键
     document.addEventListener('keydown', e => {
       if (e.ctrlKey && e.key === 'Enter') { e.preventDefault(); assembleAndRun(); }
+      else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
+        e.preventDefault();
+        if (e.shiftKey) saveAsFile(); else saveFile();
+      }
       else if (e.key === 'F5') { e.preventDefault(); togglePause(); }
       else if (e.ctrlKey && (e.key === 'r' || e.key === 'R')) { e.preventDefault(); resetMachine(); }
     });
@@ -990,10 +1148,18 @@
     // 窗口尺寸变化时重绘
     window.addEventListener('resize', () => { drawScope(); });
 
+    // 有未保存修改时离开提醒
+    window.addEventListener('beforeunload', e => {
+      if (!dirty) return;
+      e.preventDefault();
+      e.returnValue = '';
+    });
+
     // 首次载入考试模板
     const exam = samples.find(s => s.id === 'exam') || samples[0];
     if (exam) {
       setEditorText(exam.source);
+      setFileContext(exam.id + '.asm', 'sample', null, 'utf-8', exam.source.includes('\r\n') ? '\r\n' : '\n');
       sys.applySampleWiring(exam.wiring || {});
       syncWireUI();
       updateBoardTags();
@@ -1003,7 +1169,7 @@
       assembleAndRun();
     } else {
       setEditorText('; 在这里粘贴 8086 汇编代码，然后点“汇编并运行”\n');
-      updateGutter();
+      setFileContext('未命名.asm', 'sample', null, 'utf-8', '\n');
       setStatus('待机', '');
     }
 

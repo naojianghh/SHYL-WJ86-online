@@ -437,7 +437,29 @@ body.resizing.row { cursor: row-resize; }
 /* 程序页 */
 #pane-code { padding: 10px; gap: 8px; }
 .code-toolbar { display: flex; gap: 6px; align-items: center; flex: 0 0 auto; }
+.code-toolbar .btn { flex: 0 0 auto; }
 .code-toolbar select { flex: 1; min-width: 0; height: 28px; }
+.file-line {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 2px;
+  color: var(--muted);
+  font-size: 10.5px;
+  min-height: 15px;
+}
+.file-line .file-name {
+  font-family: var(--mono);
+  color: #a9c4d7;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+.file-line .file-state { margin-left: auto; color: var(--dim); white-space: nowrap; }
+.file-line.dirty .file-state { color: var(--amber); }
+.file-line.dirty .file-name::after { content: " *"; color: var(--amber); }
 .editor-shell {
   flex: 1 1 auto; min-height: 180px;
   display: flex; border: 1px solid var(--line); border-radius: 8px;

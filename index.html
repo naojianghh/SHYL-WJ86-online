@@ -152,10 +152,15 @@
           <select id="sampleSel" title="载入内置例程">
             <option value="">载入示例…</option>
           </select>
-          <button class="btn small" id="btnOpen">打开 .ASM</button>
-          <button class="btn small" id="btnSave">保存</button>
+          <button class="btn small" id="btnOpen" title="打开 .ASM（可直接保存回原文件）">打开 .ASM</button>
+          <button class="btn small" id="btnSave" title="保存到当前文件（Ctrl+S）">保存</button>
+          <button class="btn small" id="btnSaveAs" title="另存为（Ctrl+Shift+S）">另存为</button>
           <button class="btn small" id="btnWrap" title="长行自动折行">折行</button>
           <input type="file" id="fileInput" accept=".asm,.txt,.inc" hidden>
+        </div>
+        <div class="file-line" id="fileLine">
+          <span class="file-name" id="fileName">未命名.asm</span>
+          <span class="file-state" id="fileState">示例</span>
         </div>
         <div class="editor-shell">
           <div class="gutter" id="gutter">1</div>
@@ -200,6 +205,13 @@
             <li>拖动编辑器与输出日志之间的横条，调节日志高度；双击复位。</li>
             <li>点标签栏右侧的“⤢ 放大”，让当前标签页占满窗口；按 Esc 或点“⤡ 还原”退出。</li>
             <li>点“折行”让长汇编行自动换行，窄窗口下不用左右拖动。</li>
+          </ul>
+
+          <h3>打开与保存</h3>
+          <ul>
+            <li>用“打开 .ASM”通过系统文件选择器打开，点“保存”（Ctrl+S）可直接写回原文件。</li>
+            <li>“另存为”（Ctrl+Shift+S）选择新位置；通过普通文件框或示例载入时没有写句柄，保存会转为另存为。</li>
+            <li>自动识别 UTF-8 / GBK，并按原编码、原换行写回；文件名和未保存状态显示在编辑器上方。</li>
           </ul>
 
           <h3>默认端口与接线</h3>

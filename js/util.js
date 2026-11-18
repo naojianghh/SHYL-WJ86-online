@@ -35,10 +35,11 @@
   };
 
   /* 解码上传的汇编源文件：优先 UTF-8，失败则按 GBK/GB18030（实验指导书与
-     A86 工程里的 .ASM 多数是 GBK 编码）。 */
-  U.decodeSource = function (arrayBuffer) {
+     A86 工程里的 .ASM 多数是 GBK 编码）。返回文本与编码，保存时按原编码写回。 */
+  U.decodeSourceEx = function (arrayBuffer) {
     const bytes = new Uint8Array(arrayBuffer);
     let text = null;
+    let encoding = 'utf-8';
     try {
       text = new TextDecoder('utf-8', { fatal: true }).decode(bytes);
     } catch (e) {
@@ -48,14 +49,65 @@
       for (const enc of ['gb18030', 'gbk']) {
         try {
           text = new TextDecoder(enc, { fatal: true }).decode(bytes);
+          encoding = 'gbk';
           break;
         } catch (e) { /* 继续尝试 */ }
       }
     }
     if (text === null) {
       text = new TextDecoder('utf-8').decode(bytes);
+      encoding = 'utf-8';
     }
-    return text.replace(/^\uFEFF/, '');
+    return { text: text.replace(/^\uFEFF/, ''), encoding: encoding };
+  };
+
+  U.decodeSource = function (arrayBuffer) {
+    return U.decodeSourceEx(arrayBuffer).text;
+  };
+
+  /* 把文本按指定编码写回文件。浏览器只原生支持 UTF-8 编码，
+     GBK 用 TextDecoder 反查出来的双字节表来编码，保留原始文件的中文注释编码。 */
+  let gbkEncodeMap = null;
+
+  function buildGbkMap() {
+    gbkEncodeMap = new Map();
+    let dec = null;
+    try { dec = new TextDecoder('gbk'); } catch (e) { dec = null; }
+    if (!dec) return;
+    const pair = new Uint8Array(2);
+    for (let lead = 0x81; lead <= 0xFE; lead++) {
+      for (let trail = 0x40; trail <= 0xFE; trail++) {
+        if (trail === 0x7F) continue;
+        pair[0] = lead; pair[1] = trail;
+        let ch;
+        try { ch = dec.decode(pair); } catch (e) { continue; }
+        if (ch.length === 1 && ch !== '\uFFFD' && !gbkEncodeMap.has(ch)) {
+          gbkEncodeMap.set(ch, [lead, trail]);
+        }
+      }
+    }
+  }
+
+  U.gbkEncode = function (text) {
+    if (!gbkEncodeMap) buildGbkMap();
+    const out = [];
+    for (const ch of text) {
+      const code = ch.codePointAt(0);
+      if (code < 0x80) { out.push(code); continue; }
+      if (code === 0x20AC) { out.push(0x80); continue; }
+      const pair = gbkEncodeMap.get(ch);
+      if (pair) out.push(pair[0], pair[1]);
+      else out.push(0x3F); // 无法用 GBK 表示的字符写成 '?'
+    }
+    return new Uint8Array(out);
+  };
+
+  U.encodeSource = function (text, encoding) {
+    if (encoding === 'gbk') {
+      try { return U.gbkEncode(text); }
+      catch (e) { return new TextEncoder().encode(text); }
+    }
+    return new TextEncoder().encode(text);
   };
 
   U.fmtTime = function (seconds) {
