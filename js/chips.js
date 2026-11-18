@@ -522,14 +522,22 @@
       for (let r = 0; r < 8; r++) this.lastOn[r].fill(-1);
     }
 
-    /* PA = 行数据 R1~R8（PA7 最上一行），PB = 列选通 C1~C8（PB0 最左） */
-    update(pa, pb, t, invertRow, invertCol) {
+    /* PA = 行数据 R1~R8（PA7 最上一行），PB = 列选通 C1~C8（PB0 最左）。
+       rotate 为显示方向：0/90/180/270 顺时针角度。 */
+    update(pa, pb, t, invertRow, invertCol, rotate) {
       const rows = (invertRow ? ~pa : pa) & 0xFF;
       const cols = (invertCol ? ~pb : pb) & 0xFF;
+      rotate = +rotate || 0;
       for (let r = 0; r < 8; r++) {
         if (!((rows >> (7 - r)) & 1)) continue;
         for (let c = 0; c < 8; c++) {
-          if ((cols >> c) & 1) this.lastOn[r][c] = t;
+          if ((cols >> c) & 1) {
+            let rr = r, cc = c;
+            if (rotate === 90) { rr = c; cc = 7 - r; }
+            else if (rotate === 180) { rr = 7 - r; cc = 7 - c; }
+            else if (rotate === 270) { rr = 7 - c; cc = r; }
+            this.lastOn[rr][cc] = t;
+          }
         }
       }
     }

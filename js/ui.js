@@ -73,6 +73,7 @@
       rows: [
         { key: 'digitPort', label: '数码管位选端口', type: 'select', options: ['PC', 'PB'] },
         { key: 'matrixMode', label: '点阵接法（PA 行 / PB 列）', type: 'check' },
+        { key: 'matrixRotate', label: '点阵方向（0/90/180/270°）', type: 'select', options: ['0', '90', '180', '270'] },
         { key: 'digitReverse', label: '数码管位序反转（PC0 最左）', type: 'check' },
         { key: 'invertSeg', label: '共阳数码管（段码反相）', type: 'check' },
         { key: 'invertDig', label: '位选低有效', type: 'check' },
@@ -271,6 +272,7 @@
       const key = e.target.dataset && e.target.dataset.key;
       if (!key) return;
       if (e.target.type === 'checkbox') sys.wiring[key] = e.target.checked;
+      else if (key === 'matrixRotate') sys.wiring[key] = parseInt(e.target.value, 10) || 0;
       else sys.wiring[key] = e.target.value;
       updateBoardTags();
     });
@@ -307,7 +309,9 @@
   function updateBoardTags() {
     const w = sys.wiring;
     const p = w.patch;
-    $('#matrixTag').textContent = w.matrixMode ? 'PA=行 / PB=列' : '未接入（接线页启用）';
+    $('#matrixTag').textContent = w.matrixMode
+      ? 'PA=行 / PB=列 · ' + (w.matrixRotate || 0) + '°'
+      : '未接入（接线页启用）';
     $('#segTag').textContent = (w.invertSeg ? '共阳' : '共阴') + ' / ' + (w.invertDig ? '位选低有效' : '段高有效');
     $('#segFoot').textContent = w.digitPort === 'PB'
       ? 'PA=段码，PB=位选' + (w.digitReverse ? '（PB0 最左）' : '（PB0 最右）')

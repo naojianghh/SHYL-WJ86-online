@@ -114,7 +114,8 @@ Firefox 亦可运行；不支持 IE。页面使用普通 \texttt{<script>} 加�
 
 \begin{itemize}
   \item \textbf{8$\times$8 LED 点阵}：PA 送行数据（PA7 为最上一行），PB 送列选通
-        （PB0 为最左一列）。勾选“点阵接法”后显示红色点阵。
+        （PB0 为最左一列）。勾选“点阵接法”后显示红色点阵，方向默认顺时针 90°，
+        可在接线页改为 0/90/180/270°。
   \item \textbf{8 位数码管}：PA0$\sim$PA7 为段码 a$\sim$g、dp，PC0$\sim$PC7（或 PB0$\sim$PB7）
         为位选；按扫描余辉模型显示。
   \item \textbf{发光二极管}：默认 PB0$\sim$PB7 对应 L1$\sim$L8，高电平点亮；
@@ -201,7 +202,7 @@ Firefox 亦可运行；不支持 IE。页面使用普通 \texttt{<script>} 加�
 \begin{figure}[H]
   \centering
   \includegraphics[width=0.96\textwidth]{fig03_matrix.png}
-  \caption{实验三-6：8$\times$8 点阵显示“接口技术”的第一个字“接”}
+  \caption{实验三-6：8$\times$8 点阵在 90° 方向下显示“接口技术”的第一个字“接”}
   \label{fig:matrix}
 \end{figure}
 
@@ -301,6 +302,8 @@ Firefox 亦可运行；不支持 IE。页面使用普通 \texttt{<script>} 加�
 \subsection{点阵}
 
 点阵按“PA 行、PB 列”接法：PA7 为最上一行，PB0 为最左一列，行/列均为高有效。
+显示方向默认顺时针 90°；若程序里的字模已按显示方向排好，可在接线页把“点阵方向”改回 0°，
+也可选 180° 或 270°。
 未勾选“点阵接法”时，PA/PB 仍按数码管段码和 LED 解释，点阵区域显示为未接入。
 若点阵模块行或列反相，勾选对应的“行反相 / 列反相”。
 

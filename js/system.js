@@ -27,6 +27,7 @@
 
   const STRUCT_DEFAULT = {
     matrixMode: false,
+    matrixRotate: 90,
     digitReverse: false,
     digitPort: 'PC',
     invertSeg: false,
@@ -115,6 +116,7 @@
       w = w || {};
       const s = this.wiring;
       s.matrixMode = !!w.matrixMode;
+      s.matrixRotate = w.matrixRotate === undefined ? 90 : (+w.matrixRotate || 0);
       s.digitReverse = !!w.digitReverse;
       s.digitPort = w.digitPort || 'PC';
       s.invertSeg = !!w.invertSeg;
@@ -353,7 +355,7 @@
       this.seg.tick(t);
       const colSel = w.invertCol ? (~pb & 0xFF) : pb;
       if (colSel !== this.lastMatrixPB && colSel !== 0 && (colSel & (colSel - 1)) === 0) {
-        this.matrix.update(pa, pb, t, w.invertRow, w.invertCol);
+        this.matrix.update(pa, pb, t, w.invertRow, w.invertCol, w.matrixRotate);
       }
       this.lastMatrixPB = colSel;
       this.lastMatrixPA = pa;
@@ -506,7 +508,8 @@
         switches: this.switches.slice(),
         scope: this.scopeEvents,
         scopeWindow: this.scopeWindow || 0.05,
-        matrixMode: w.matrixMode
+        matrixMode: w.matrixMode,
+        matrixRotate: w.matrixRotate
       };
     }
 
