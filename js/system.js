@@ -1,10 +1,40 @@
-/* SHYL-WJ86 在线模拟 —— 系统总线、接线与仿真主循环 */
+/* SHYL-WJ86 在线模拟 —— 系统总线、自由接线与仿真主循环 */
 (function (global) {
   'use strict';
   const SHYL = (global.SHYL = global.SHYL || {});
   const U = SHYL.U;
 
-  const CLOCKS = { '1MHz': 1e6, '500kHz': 5e5, '100kHz': 1e5 };
+  const CLOCKS = {
+    '1MHz': 1e6,
+    '500kHz': 5e5,
+    '100kHz': 1e5,
+    '10kHz': 1e4,
+    '1kHz': 1e3,
+    '100Hz': 1e2,
+    '10Hz': 10,
+    '1Hz': 1
+  };
+
+  /* 自由接线表：每个“目的端”可接任意一个“信号源”。
+     这里给出与实验箱默认接线一致的初始值。 */
+  const PATCH_DEFAULT = {
+    CLK0: '1MHz', CLK1: 'GND', CLK2: 'GND',
+    GATE0: '+5V', GATE1: '+5V', GATE2: '+5V',
+    IRQ0: 'OUT0', IRQ1: 'EOC', IRQ2: 'AN2', IRQ3: 'NC', IRQ4: 'NC', IRQ5: 'NC', IRQ6: 'NC', IRQ7: 'NC',
+    PC0: 'K1', PC1: 'K2', PC2: 'K3', PC3: 'K4', PC4: 'K5', PC5: 'K6', PC6: 'K7', PC7: 'K8',
+    L1: 'PB0', L2: 'PB1', L3: 'PB2', L4: 'PB3', L5: 'PB4', L6: 'PB5', L7: 'PB6', L8: 'PB7'
+  };
+
+  const STRUCT_DEFAULT = {
+    matrixMode: false,
+    digitReverse: false,
+    digitPort: 'PC',
+    invertSeg: false,
+    invertDig: false,
+    invertLed: false,
+    invertRow: false,
+    invertCol: false
+  };
 
   class System {
     constructor() {
@@ -20,40 +50,20 @@
 
       this.inputs = { PA: 0, PB: 0, PC: 0 };
       this.switches = new Array(12).fill(0);
+      this.an1Level = 0;
+      this.an2Level = 0;
       this.an1Until = 0;
       this.an2Until = 0;
-      this.ledExternal = 0;
+      this.clkLevels = [-1, -1, -1];
 
       this.t = 0;
       this.cycles = 0;
       this.cpuHz = 4e6;
       this.tickInterval = 10e-6;
 
-      this.wiring = {
-        clk0: '1MHz',
-        gate0: '+5V',
-        gate1: '+5V',
-        gate2: '+5V',
-        out0Irq: true,
-        out0Clk1: false,
-        out1Clk2: false,
-        out0Led: false,
-        out1Led: false,
-        out2Led: false,
-        out0Pc7: false,
-        out1Pc0: false,
-        adcIrq: true,
-        an2Irq: true,
-        matrixMode: false,
-        digitReverse: false,
-        digitPort: 'PC',
-        ledPort: 'PB',
-        invertSeg: false,
-        invertDig: false,
-        invertLed: false,
-        invertRow: false,
-        invertCol: false
-      };
+      this.wiring = Object.assign({}, STRUCT_DEFAULT, {
+        patch: Object.assign({}, PATCH_DEFAULT)
+      });
 
       this.program = null;
       this.initialData = null;
@@ -80,25 +90,105 @@
       this.dac.reset();
       this.seg.reset();
       this.matrix.reset();
-      this.ledExternal = 0;
+      this.an1Level = this.an2Level = 0;
       this.an1Until = this.an2Until = 0;
+      this.clkLevels = [-1, -1, -1];
       this.scopeEvents.length = 0;
       this.scopeLevels = { OUT0: 0, OUT1: 0, OUT2: 0, IRQ0: 0 };
       this.configureClocks();
     }
 
-    configureClocks() {
-      const w = this.wiring;
-      if (w.clk0 === 'AN1') {
-        this.timers[0].clockType = 'external';
-      } else {
-        this.timers[0].clockType = 'internal';
-        this.timers[0].clockFreq = CLOCKS[w.clk0] || 1e6;
+    /* ---------------- 接线 ---------------- */
+    patch(key, value) {
+      if (arguments.length === 1) return this.wiring.patch[key];
+      this.wiring.patch[key] = value;
+      this.configureClocks();
+    }
+
+    resetPatch() {
+      this.wiring.patch = Object.assign({}, PATCH_DEFAULT);
+      this.configureClocks();
+    }
+
+    /* 把旧版示例里的预设接线翻译成自由接线表 */
+    applySampleWiring(w) {
+      w = w || {};
+      const s = this.wiring;
+      s.matrixMode = !!w.matrixMode;
+      s.digitReverse = !!w.digitReverse;
+      s.digitPort = w.digitPort || 'PC';
+      s.invertSeg = !!w.invertSeg;
+      s.invertDig = !!w.invertDig;
+      s.invertLed = !!w.invertLed;
+      s.invertRow = !!w.invertRow;
+      s.invertCol = !!w.invertCol;
+
+      const p = Object.assign({}, PATCH_DEFAULT);
+      if (w.clk0) p.CLK0 = w.clk0;
+      if (w.gate0) p.GATE0 = w.gate0;
+      if (w.gate1) p.GATE1 = w.gate1;
+      if (w.gate2) p.GATE2 = w.gate2;
+      if (w.out0Irq === false) p.IRQ0 = 'NC';
+      if (w.out0Clk1) p.CLK1 = 'OUT0';
+      if (w.out1Clk2) p.CLK2 = 'OUT1';
+      if (w.out0Pc7) p.PC7 = 'OUT0';
+      if (w.out1Pc0) p.PC0 = 'OUT1';
+      if (w.out0Led) p.L1 = 'OUT0';
+      if (w.out1Led) p.L1 = 'OUT1';
+      if (w.out2Led) p.L1 = 'OUT2';
+      if (w.adcIrq === false) p.IRQ1 = 'NC';
+      if (w.an2Irq === false) p.IRQ2 = 'NC';
+      if (w.ledPort === 'PA') {
+        for (let i = 0; i < 8; i++) p['L' + (i + 1)] = 'PA' + i;
       }
-      this.timers[1].clockType = w.out0Clk1 ? 'external' : 'internal';
-      this.timers[1].clockFreq = 1e6;
-      this.timers[2].clockType = w.out1Clk2 ? 'external' : 'internal';
-      this.timers[2].clockFreq = 1e6;
+      if (w.patch) Object.assign(p, w.patch);
+      s.patch = p;
+      this.configureClocks();
+    }
+
+    configureClocks() {
+      const p = this.wiring.patch;
+      for (let i = 0; i < 3; i++) {
+        const src = p['CLK' + i];
+        const hz = CLOCKS[src];
+        const tm = this.timers[i];
+        if (hz) {
+          tm.clockType = 'internal';
+          tm.clockFreq = hz;
+        } else {
+          tm.clockType = 'external';
+        }
+      }
+      this.clkLevels = [-1, -1, -1];
+    }
+
+    /* ---------------- 信号电平 ---------------- */
+    levelOf(src, t) {
+      if (!src || src === 'NC' || src === 'GND') return 0;
+      if (src === '+5V') return 1;
+      if (CLOCKS[src]) {
+        const f = CLOCKS[src];
+        return (Math.floor((t || this.t) * f * 2) & 1) ? 1 : 0;
+      }
+      if (src === 'AN1') return this.an1Level ? 1 : 0;
+      if (src === 'AN2') return this.an2Level ? 1 : 0;
+      if (src === 'EOC') return this.adc.eoc ? 1 : 0;
+      let m = /^OUT(\d)$/.exec(src);
+      if (m) return this.timers[+m[1]].out ? 1 : 0;
+      m = /^K(\d+)$/.exec(src);
+      if (m) return this.switches[parseInt(m[1], 10) - 1] ? 1 : 0;
+      m = /^P([ABC])(\d)$/.exec(src);
+      if (m) return (this.ppi.out['P' + m[1]] >> parseInt(m[2], 10)) & 1;
+      return 0;
+    }
+
+    getInputs() {
+      let PA = 0, PB = 0, PC = 0;
+      for (let i = 0; i < 8; i++) {
+        if (this.switches[i]) { PA |= (1 << i); PB |= (1 << i); }
+        if (this.levelOf(this.wiring.patch['PC' + i], this.t)) PC |= (1 << i);
+      }
+      return { PA: PA, PB: PB, PC: PC };
     }
 
     warn(msg) {
@@ -149,9 +239,17 @@
       this.switches[i] = v ? 1 : 0;
     }
 
-    /* ------------------------------------------------------------------ */
-    /* 端口译码                                                           */
-    /* ------------------------------------------------------------------ */
+    pulseAN1() {
+      this.an1Level = 1;
+      this.an1Until = this.t + 0.002;
+    }
+
+    pulseAN2() {
+      this.an2Level = 1;
+      this.an2Until = this.t + 0.002;
+    }
+
+    /* ---------------- 端口译码 ---------------- */
     ioRead(port) {
       port &= 0xFFFF;
       if (port >= 0x200 && port <= 0x20F) {
@@ -164,7 +262,7 @@
       if (port >= 0x250 && port <= 0x25F) return this.dac.value;
       if (port >= 0x260 && port <= 0x26F) {
         const v = this.adc.read();
-        if (this.wiring.adcIrq) this.pic.setLine(1, 0);
+        this.pic.setLine(1, this.levelOf(this.wiring.patch.IRQ1, this.t) ? 1 : 0);
         return v;
       }
       return 0xFF;
@@ -201,45 +299,48 @@
       this.warn('访问了未译码的 I/O 端口 ' + U.hex(port, 4) + 'H');
     }
 
-    /* ------------------------------------------------------------------ */
-    /* 接线与芯片刷新                                                     */
-    /* ------------------------------------------------------------------ */
-    gateFor(name) {
-      if (name === '+5V') return true;
-      const m = /^K(\d+)$/.exec(name);
-      if (m) return !!this.switches[parseInt(m[1], 10) - 1];
-      return true;
-    }
-
+    /* ---------------- 芯片刷新 ---------------- */
     tick(t) {
       const w = this.wiring;
-      this.timers[0].setGate(this.gateFor(w.gate0), t);
-      this.timers[1].setGate(this.gateFor(w.gate1), t);
-      this.timers[2].setGate(this.gateFor(w.gate2), t);
+      const p = w.patch;
 
-      // 8253 计数器 0
-      const r0 = this.timers[0].update(t);
-      if (w.out0Irq) this.pic.setLine(0, r0.level);
-      if (w.out0Led) this.ledExternal = r0.level;
-      if (w.out0Clk1) this.timers[1].addEdges(r0.falls, t);
+      if (this.an1Until && t >= this.an1Until) { this.an1Until = 0; this.an1Level = 0; }
+      if (this.an2Until && t >= this.an2Until) { this.an2Until = 0; this.an2Level = 0; }
 
-      // 计数器 1
-      const r1 = this.timers[1].update(t);
-      if (w.out1Led) this.ledExternal = r1.level;
-      if (w.out1Clk2) this.timers[2].addEdges(r1.falls, t);
+      // GATE 电平和外部时钟边沿（非 OUT 源）
+      for (let i = 0; i < 3; i++) {
+        this.timers[i].setGate(!!this.levelOf(p['GATE' + i], t), t);
+        const src = p['CLK' + i];
+        if (!CLOCKS[src] && !/^OUT\d$/.test(src)) {
+          const lv = this.levelOf(src, t) ? 1 : 0;
+          if (this.clkLevels[i] === 1 && lv === 0) this.timers[i].addEdges(1, t);
+          this.clkLevels[i] = lv;
+        }
+      }
 
-      // 计数器 2
-      const r2 = this.timers[2].update(t);
-      if (w.out2Led) this.ledExternal = r2.level;
+      // 计数器更新 + OUT 级联
+      const res = [null, null, null];
+      for (let pass = 0; pass < 3; pass++) {
+        let changed = false;
+        for (let i = 0; i < 3; i++) res[i] = this.timers[i].update(t);
+        for (let i = 0; i < 3; i++) {
+          const m = /^OUT(\d)$/.exec(p['CLK' + i]);
+          if (m) {
+            const j = +m[1];
+            if (j !== i && res[j].falls > 0) {
+              this.timers[i].addEdges(res[j].falls, t);
+              changed = true;
+            }
+          }
+        }
+        if (!changed) break;
+      }
 
-      // ADC
       this.adc.tick(t);
-      if (w.adcIrq) this.pic.setLine(1, this.adc.eoc ? 1 : 0);
 
-      // 按键脉冲
-      if (this.an2Until && t >= this.an2Until) {
-        this.an2Until = 0;
-        if (w.an2Irq) this.pic.setLine(2, 0);
+      // 8259 的 8 根中断输入
+      for (let i = 0; i < 8; i++) {
+        this.pic.setLine(i, this.levelOf(p['IRQ' + i], t) ? 1 : 0);
       }
 
       // 数码管 / 点阵扫描余辉
@@ -250,7 +351,6 @@
         this.lastPA = pa; this.lastPC = digitSel;
       }
       this.seg.tick(t);
-      // 点阵：只在列选通变为“单列有效”时取行数据，避免 PA 先变、PB 未变时产生鬼影
       const colSel = w.invertCol ? (~pb & 0xFF) : pb;
       if (colSel !== this.lastMatrixPB && colSel !== 0 && (colSel & (colSel - 1)) === 0) {
         this.matrix.update(pa, pb, t, w.invertRow, w.invertCol);
@@ -274,33 +374,7 @@
       if (this.scopeEvents.length > 40000) this.scopeEvents.splice(0, 10000);
     }
 
-    getInputs() {
-      let PA = 0, PB = 0, PC = 0;
-      for (let i = 0; i < 8; i++) {
-        if (this.switches[i]) { PA |= (1 << i); PB |= (1 << i); PC |= (1 << i); }
-      }
-      if (this.wiring.out0Pc7) PC = (PC & 0x7F) | ((this.timers[0].out ? 1 : 0) << 7);
-      if (this.wiring.out1Pc0) PC = (PC & 0xFE) | (this.timers[1].out ? 1 : 0);
-      return { PA: PA, PB: PB, PC: PC };
-    }
-
-    pulseAN1() {
-      if (this.wiring.clk0 === 'AN1') {
-        this.timers[0].addEdges(1, this.t);
-      } else {
-        this.warn('AN1 未接到 CLK0，脉冲不影响 8253');
-      }
-    }
-
-    pulseAN2() {
-      this.an2Until = this.t + 0.002;
-      if (this.wiring.an2Irq) this.pic.setLine(2, 1);
-      else this.warn('AN2 未接到 IRQ2');
-    }
-
-    /* ------------------------------------------------------------------ */
-    /* 执行                                                               */
-    /* ------------------------------------------------------------------ */
+    /* ---------------- 执行 ---------------- */
     stepOnce() {
       if (this.cpu.halted) {
         if (this.cpu.flags.IF && this.pic.peek() >= 0) {
@@ -333,7 +407,6 @@
       if (this.cpu.fault && this.onFault) this.onFault(this.cpu.fault);
     }
 
-    /* 运行指定虚拟秒数（无 UI 时用于测试） */
     runSeconds(seconds, maxSteps) {
       const targetCycles = Math.floor(seconds * this.cpuHz);
       let used = 0;
@@ -342,7 +415,6 @@
       while (used < targetCycles && steps < limit && !this.cpu.fault) {
         const c = this.stepOnce();
         if (c === 0) {
-          // CPU 停顿：推进时间，仍让定时器工作
           if (this.cpu.halted) {
             const dt = Math.min(0.001, (targetCycles - used) / this.cpuHz);
             this.t += dt;
@@ -361,7 +433,6 @@
       return { cycles: used, steps: steps };
     }
 
-    /* 每帧按实际耗时推进 */
     runForWallTime(seconds, speed) {
       const budget = Math.max(0, seconds * this.cpuHz * (speed || 1));
       let used = 0;
@@ -394,16 +465,24 @@
       return used;
     }
 
-    /* ------------------------------------------------------------------ */
-    /* 给 UI 用的快照                                                     */
-    /* ------------------------------------------------------------------ */
+    /* ---------------- 快照 ---------------- */
     snapshot() {
       const cpu = this.cpu;
       const regs = {};
       for (const r of ['AX', 'BX', 'CX', 'DX', 'SI', 'DI', 'BP', 'SP', 'CS', 'DS', 'ES', 'SS']) regs[r] = cpu.regs[r];
       const w = this.wiring;
-      const ledSrc = w.ledPort === 'PA' ? this.ppi.out.PA : this.ppi.out.PB;
-      const ledHidden = (w.ledPort === 'PB' && (w.digitPort === 'PB' || w.matrixMode));
+      const p = w.patch;
+
+      let leds = 0;
+      let allPB = true;
+      for (let i = 0; i < 8; i++) {
+        let v = this.levelOf(p['L' + (i + 1)], this.t) ? 1 : 0;
+        if (p['L' + (i + 1)] !== 'PB' + i) allPB = false;
+        if (w.invertLed) v = v ? 0 : 1;
+        leds |= v << i;
+      }
+      const ledHidden = (w.digitPort === 'PB' || w.matrixMode) && allPB;
+
       return {
         t: this.t,
         cycles: this.cycles,
@@ -420,14 +499,14 @@
           eoc: this.adc.eoc, converting: this.adc.converting, count: this.adc.conversions
         },
         dac: { value: this.dac.value, volts: this.dac.volts },
-        seg: this.seg.render(this.t, this.wiring.digitReverse),
+        seg: this.seg.render(this.t, w.digitReverse),
         matrix: this.matrix.render(this.t),
-        leds: ledHidden ? 0 : ((w.invertLed ? ~ledSrc : ledSrc) & 0xFF),
-        extLed: this.ledExternal,
+        leds: ledHidden ? 0 : leds,
+        extLed: 0,
         switches: this.switches.slice(),
         scope: this.scopeEvents,
         scopeWindow: this.scopeWindow || 0.05,
-        matrixMode: this.wiring.matrixMode
+        matrixMode: w.matrixMode
       };
     }
 
@@ -440,4 +519,7 @@
   }
 
   SHYL.System = System;
+  SHYL.PATCH_DEFAULT = PATCH_DEFAULT;
+  SHYL.STRUCT_DEFAULT = STRUCT_DEFAULT;
+  SHYL.CLOCKS = CLOCKS;
 })(typeof window !== 'undefined' ? window : globalThis);

@@ -483,6 +483,12 @@ h1, h2, h3, p, ol, ul { margin: 0; }
 #pane-wire { gap: 10px; }
 .pane-tip { color: var(--muted); font-size: 11px; line-height: 1.6; }
 .wire-form { display: flex; flex-direction: column; gap: 10px; }
+.wire-presets { display: flex; flex-wrap: wrap; gap: 6px; padding-bottom: 2px; }
+.wire-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 6px; }
+.wire-grid .wire-row { padding: 4px 8px; }
+.wire-grid .wire-row label { font-family: var(--mono); font-size: 10px; }
+.wire-grid .wire-row select { width: 92px; font-size: 10px; padding: 2px 3px; }
+.wire-rows .wire-row { padding: 5px 9px; }
 .wire-group { border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
 .wire-group h4 {
   margin: 0; padding: 6px 9px; font-size: 11px; font-weight: 500; color: #a8d7e8;

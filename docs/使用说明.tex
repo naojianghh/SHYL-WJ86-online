@@ -134,7 +134,7 @@ Firefox 亦可运行；不支持 IE。页面使用普通 \texttt{<script>} 加�
   \item[程序] 汇编代码编辑区、内置示例、打开/保存、汇编错误列表、输出日志。
   \item[寄存器] AX$\sim$SS、IP、周期计数与 CF/PF/AF/ZF/SF/TF/IF/DF/OF 标志。
   \item[芯片] 8253 三个通道、8255 三个端口、8259 的 IMR/IRR/ISR、0809 与 0832 状态。
-  \item[接线] 时钟源、GATE、OUT 去向、中断线、显示极性与位序等设置。
+  \item[接线] 自由接线表：CLK、GATE、IRQ、PC 输入、LED 源，以及显示极性与位序。
   \item[说明] 快速上手、端口表、位序说明和快捷键。
 \end{description}
 
@@ -231,17 +231,29 @@ Firefox 亦可运行；不支持 IE。页面使用普通 \texttt{<script>} 加�
   \item 0809：片选 260H；CLK 接 500 kHz；IN0 接 0$\sim$5 V 电位器。
 \end{itemize}
 
-\subsection{接线页选项}
+\subsection{自由接线}
 
-“接线”页可以修改时钟源、GATE 来源、OUT 去向、中断线和显示极性。常用选项：
+“接线”页是一张自由接线表：每个目的端在左侧，右侧下拉框选择信号源；同一信号可以同时接到多路。
 
 \begin{itemize}
-  \item \texttt{OUT0$\rightarrow$CLK1}、\texttt{OUT1$\rightarrow$CLK2}：8253 级联；
-  \item \texttt{OUT0$\rightarrow$PC7}：把 1 kHz 方波送入 8255 PC7，供软件查询 1 ms 节拍；
-  \item \texttt{OUT1$\rightarrow$PC0}：把 1 Hz 方波送入 PC0，供交通灯等程序查询 1 秒；
-  \item \texttt{OUT0/1/2$\rightarrow$L1}：用计数器的 OUT 直接驱动一个 LED；
-  \item 数码管位选端口（PC/PB）、LED 接 PB/PA、点阵接法、共阳/共阴、位选极性。
+  \item \texttt{CLK0}$\sim$\texttt{CLK2}：固定脉冲（1 MHz、500 kHz、100 kHz、10 kHz、1 kHz、
+        100 Hz、10 Hz、1 Hz）、\texttt{OUT0}$\sim$\texttt{OUT2}、\texttt{AN1}、\texttt{K1}$\sim$\texttt{K12}、\texttt{GND}；
+  \item \texttt{GATE0}$\sim$\texttt{GATE2}：\texttt{+5V}、\texttt{GND}、\texttt{OUT0}$\sim$\texttt{OUT2}、
+        \texttt{AN1}、\texttt{AN2}、\texttt{K1}$\sim$\texttt{K12}；
+  \item \texttt{IRQ0}$\sim$\texttt{IRQ7}：\texttt{OUT0}$\sim$\texttt{OUT2}、\texttt{EOC}、
+        \texttt{AN1}、\texttt{AN2}、\texttt{K1}$\sim$\texttt{K12}、\texttt{+5V}、\texttt{GND}、\texttt{NC}；
+  \item \texttt{PC0}$\sim$\texttt{PC7}：\texttt{OUT0}$\sim$\texttt{OUT2}、\texttt{EOC}、
+        \texttt{AN1}、\texttt{AN2}、\texttt{K1}$\sim$\texttt{K12}、\texttt{+5V}、\texttt{GND}；
+  \item \texttt{L1}$\sim$\texttt{L8}：\texttt{PB0}$\sim$\texttt{PB7}、\texttt{PA0}$\sim$\texttt{PA7}、
+        \texttt{OUT0}$\sim$\texttt{OUT2}、\texttt{AN1}、\texttt{AN2}、\texttt{K1}$\sim$\texttt{K12}、
+        \texttt{+5V}、\texttt{GND}、\texttt{NC}。
 \end{itemize}
+
+此外，8255 的 \texttt{PA0}$\sim$\texttt{PA7}、\texttt{PB0}$\sim$\texttt{PB7}、\texttt{PC0}$\sim$\texttt{PC7}
+引脚也可以作为任意一路的源。
+
+“默认接线”“8253 级联”“1 ms 节拍$\rightarrow$PC7”“点阵接线”“交通灯”五个按钮可以快速套用常用组合。
+显示部分另有数码管位选端口（PC/PB）、点阵接法、共阳/共阴、位选极性与 LED 极性。
 
 修改接线立即生效；复位后保留。若把某根线改到与程序不符的位置，面板会显示对应错误现象，
 可对照“芯片”页的端口值排查。
@@ -249,7 +261,7 @@ Firefox 亦可运行；不支持 IE。页面使用普通 \texttt{<script>} 加�
 \begin{figure}[H]
   \centering
   \includegraphics[width=0.96\textwidth]{fig05_wire.png}
-  \caption{接线页：时钟、门控、输出、中断与显示极性}
+  \caption{接线页：自由接线表、常用预设与显示极性}
   \label{fig:wire}
 \end{figure}
 

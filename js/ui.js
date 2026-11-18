@@ -17,41 +17,61 @@
     [10, 48, 46, 48]   // g
   ];
 
+  const K12 = Array.from({ length: 12 }, (_, i) => 'K' + (i + 1));
+  const PINS = Array.from({ length: 8 }, (_, i) => 'PA' + i)
+    .concat(Array.from({ length: 8 }, (_, i) => 'PB' + i))
+    .concat(Array.from({ length: 8 }, (_, i) => 'PC' + i));
+  const FIXED_CLOCKS = ['1MHz', '500kHz', '100kHz', '10kHz', '1kHz', '100Hz', '10Hz', '1Hz'];
+  const CLK_SRC = FIXED_CLOCKS.concat(['OUT0', 'OUT1', 'OUT2', 'EOC', 'AN1', 'AN2'], K12, PINS, ['GND']);
+  const GATE_SRC = ['+5V', 'GND', 'OUT0', 'OUT1', 'OUT2', 'EOC', 'AN1', 'AN2'].concat(K12, PINS);
+  const IRQ_SRC = ['NC', 'OUT0', 'OUT1', 'OUT2', 'EOC', 'AN1', 'AN2', '+5V', 'GND'].concat(K12, PINS);
+  const PC_SRC = ['OUT0', 'OUT1', 'OUT2', 'EOC', 'AN1', 'AN2', '+5V', 'GND'].concat(K12, PINS);
+  const LED_SRC = ['NC'].concat(PINS, ['OUT0', 'OUT1', 'OUT2', 'EOC', 'AN1', 'AN2', '+5V', 'GND'], K12);
+
   const WIRE_SCHEMA = [
     {
-      title: '8253 时钟与门控',
+      title: '8253 时钟输入',
+      grid: true,
       rows: [
-        { key: 'clk0', label: 'CLK0 时钟源', type: 'select', options: ['1MHz', '500kHz', '100kHz', 'AN1'] },
-        { key: 'gate0', label: 'GATE0', type: 'select', options: ['+5V', 'K1', 'K2', 'K3', 'K4'] },
-        { key: 'gate1', label: 'GATE1', type: 'select', options: ['+5V', 'K1', 'K2', 'K3', 'K4'] },
-        { key: 'gate2', label: 'GATE2', type: 'select', options: ['+5V', 'K1', 'K2', 'K3', 'K4'] }
+        { patch: 'CLK0', label: 'CLK0', options: CLK_SRC },
+        { patch: 'CLK1', label: 'CLK1', options: CLK_SRC },
+        { patch: 'CLK2', label: 'CLK2', options: CLK_SRC }
       ]
     },
     {
-      title: '8253 输出',
+      title: '8253 门控输入',
+      grid: true,
       rows: [
-        { key: 'out0Irq', label: 'OUT0 → 8259 IRQ0', type: 'check' },
-        { key: 'out0Clk1', label: 'OUT0 → CLK1（级联）', type: 'check' },
-        { key: 'out1Clk2', label: 'OUT1 → CLK2（级联）', type: 'check' },
-        { key: 'out0Pc7', label: 'OUT0 → 8255 PC7（1 ms 节拍）', type: 'check' },
-        { key: 'out1Pc0', label: 'OUT1 → 8255 PC0（1 s 节拍）', type: 'check' },
-        { key: 'out0Led', label: 'OUT0 → L1', type: 'check' },
-        { key: 'out1Led', label: 'OUT1 → L1', type: 'check' },
-        { key: 'out2Led', label: 'OUT2 → L1', type: 'check' }
+        { patch: 'GATE0', label: 'GATE0', options: GATE_SRC },
+        { patch: 'GATE1', label: 'GATE1', options: GATE_SRC },
+        { patch: 'GATE2', label: 'GATE2', options: GATE_SRC }
       ]
     },
     {
-      title: '中断与模拟量',
-      rows: [
-        { key: 'adcIrq', label: '0809 EOC → 8259 IRQ1', type: 'check' },
-        { key: 'an2Irq', label: 'AN2 → 8259 IRQ2', type: 'check' }
-      ]
+      title: '8259 中断输入',
+      grid: true,
+      rows: [0, 1, 2, 3, 4, 5, 6, 7].map(i => ({
+        patch: 'IRQ' + i, label: 'IRQ' + i, options: IRQ_SRC
+      }))
+    },
+    {
+      title: '8255 PC 口输入',
+      grid: true,
+      rows: [0, 1, 2, 3, 4, 5, 6, 7].map(i => ({
+        patch: 'PC' + i, label: 'PC' + i, options: PC_SRC
+      }))
+    },
+    {
+      title: '发光二极管接线',
+      grid: true,
+      rows: [0, 1, 2, 3, 4, 5, 6, 7].map(i => ({
+        patch: 'L' + (i + 1), label: 'L' + (i + 1), options: LED_SRC
+      }))
     },
     {
       title: '显示与极性',
       rows: [
         { key: 'digitPort', label: '数码管位选端口', type: 'select', options: ['PC', 'PB'] },
-        { key: 'ledPort', label: '发光二极管接在', type: 'select', options: ['PB', 'PA'] },
         { key: 'matrixMode', label: '点阵接法（PA 行 / PB 列）', type: 'check' },
         { key: 'digitReverse', label: '数码管位序反转（PC0 最左）', type: 'check' },
         { key: 'invertSeg', label: '共阳数码管（段码反相）', type: 'check' },
@@ -63,9 +83,16 @@
     }
   ];
 
+  const PRESETS = [
+    { id: 'default', label: '默认接线', wiring: {} },
+    { id: 'cascade', label: '8253 级联', wiring: { out0Clk1: true, out1Clk2: true } },
+    { id: 'tick', label: '1 ms 节拍→PC7', wiring: { out0Pc7: true } },
+    { id: 'matrix', label: '点阵接线', wiring: { out0Pc7: true, matrixMode: true } },
+    { id: 'traffic', label: '交通灯', wiring: { out0Clk1: true, out1Pc0: true, ledPort: 'PA' } }
+  ];
+
   const sys = new SHYL.System();
   const asm = new SHYL.Assembler();
-  const DEFAULT_WIRING = Object.assign({}, sys.wiring);
 
   let running = false;
   let paused = false;
@@ -182,6 +209,8 @@
       const h = document.createElement('h4');
       h.textContent = group.title;
       box.appendChild(h);
+      const body = document.createElement('div');
+      body.className = group.grid ? 'wire-grid' : 'wire-rows';
       for (const row of group.rows) {
         const div = document.createElement('div');
         div.className = 'wire-row';
@@ -194,6 +223,19 @@
           label.textContent = row.label;
           label.prepend(cb);
           div.appendChild(label);
+        } else if (row.patch) {
+          const label = document.createElement('label');
+          label.textContent = row.label;
+          const sel = document.createElement('select');
+          sel.dataset.patch = row.patch;
+          for (const opt of row.options) {
+            const o = document.createElement('option');
+            o.value = opt; o.textContent = opt;
+            sel.appendChild(o);
+          }
+          sel.value = sys.wiring.patch[row.patch];
+          div.appendChild(label);
+          div.appendChild(sel);
         } else {
           const label = document.createElement('label');
           label.textContent = row.label;
@@ -208,23 +250,49 @@
           div.appendChild(label);
           div.appendChild(sel);
         }
-        box.appendChild(div);
+        body.appendChild(div);
       }
+      box.appendChild(body);
       host.appendChild(box);
     }
 
     host.addEventListener('change', e => {
+      const patchKey = e.target.dataset && e.target.dataset.patch;
+      if (patchKey) {
+        sys.wiring.patch[patchKey] = e.target.value;
+        sys.configureClocks();
+        updateBoardTags();
+        return;
+      }
       const key = e.target.dataset && e.target.dataset.key;
       if (!key) return;
       if (e.target.type === 'checkbox') sys.wiring[key] = e.target.checked;
       else sys.wiring[key] = e.target.value;
-      sys.configureClocks();
       updateBoardTags();
-      if (key === 'out0Irq' && !sys.wiring.out0Irq) sys.pic.setLine(0, 0);
     });
+
+    // 常用接线预设
+    const presetHost = $('#wirePresets');
+    presetHost.innerHTML = '';
+    for (const preset of PRESETS) {
+      const btn = document.createElement('button');
+      btn.className = 'btn small';
+      btn.type = 'button';
+      btn.textContent = preset.label;
+      btn.addEventListener('click', () => {
+        sys.applySampleWiring(preset.wiring);
+        syncWireUI();
+        updateBoardTags();
+        logLine('── 接线预设：' + preset.label + ' ──');
+      });
+      presetHost.appendChild(btn);
+    }
   }
 
   function syncWireUI() {
+    $$('#wireForm [data-patch]').forEach(el => {
+      el.value = sys.wiring.patch[el.dataset.patch];
+    });
     $$('#wireForm [data-key]').forEach(el => {
       const key = el.dataset.key;
       if (el.type === 'checkbox') el.checked = !!sys.wiring[key];
@@ -234,14 +302,25 @@
 
   function updateBoardTags() {
     const w = sys.wiring;
+    const p = w.patch;
     $('#matrixTag').textContent = w.matrixMode ? 'PA=行 / PB=列' : '未接入（接线页启用）';
     $('#segTag').textContent = (w.invertSeg ? '共阳' : '共阴') + ' / ' + (w.invertDig ? '位选低有效' : '段高有效');
     $('#segFoot').textContent = w.digitPort === 'PB'
       ? 'PA=段码，PB=位选' + (w.digitReverse ? '（PB0 最左）' : '（PB0 最右）')
       : (w.digitReverse ? 'PA=段码，PC0 最左' : 'PA=段码，PC0 最右');
-    $('#ledFoot').textContent = (w.ledPort === 'PB' && (w.digitPort === 'PB' || w.matrixMode))
+
+    let allPB = true, allPA = true;
+    for (let i = 0; i < 8; i++) {
+      const s = p['L' + (i + 1)];
+      if (s !== 'PB' + i) allPB = false;
+      if (s !== 'PA' + i) allPA = false;
+    }
+    const hidden = (w.digitPort === 'PB' || w.matrixMode) && allPB;
+    $('#ledFoot').textContent = hidden
       ? 'PB 已用于' + (w.digitPort === 'PB' ? '位选' : '点阵列') + '，L1…L8 不显示'
-      : 'L1 … L8 ← ' + w.ledPort + '0…' + w.ledPort + '7' + (w.invertLed ? '（低电平点亮）' : '（高电平点亮）');
+      : (allPB ? 'L1 … L8 ← PB0…PB7'
+        : (allPA ? 'L1 … L8 ← PA0…PA7'
+          : '自由接线（在接线页逐路选择）')) + (w.invertLed ? '（低电平点亮）' : '');
     $('#matrix').classList.toggle('off', !w.matrixMode);
   }
 
@@ -406,10 +485,7 @@
     }
 
     // LED
-    let leds = snap.leds;
-    if (w.out0Led || w.out1Led || w.out2Led) {
-      leds = (leds & 0xFE) | (snap.extLed ? 1 : 0);
-    }
+    const leds = snap.leds;
     for (let i = 0; i < 8; i++) ledEls[i].classList.toggle('on', !!((leds >> i) & 1));
 
     // DAC
@@ -690,9 +766,8 @@
       const s = samples.find(x => x.id === sampleSel.value);
       if (!s) return;
       setEditorText(s.source);
-      sys.wiring = Object.assign({}, DEFAULT_WIRING, s.wiring || {});
+      sys.applySampleWiring(s.wiring || {});
       syncWireUI();
-      sys.configureClocks();
       updateBoardTags();
       assembleAndRun();
       logLine('── 载入示例：' + s.name + ' ──');
@@ -753,9 +828,8 @@
     const exam = samples.find(s => s.id === 'exam') || samples[0];
     if (exam) {
       setEditorText(exam.source);
-      if (exam.wiring) sys.wiring = Object.assign({}, DEFAULT_WIRING, exam.wiring);
+      sys.applySampleWiring(exam.wiring || {});
       syncWireUI();
-      sys.configureClocks();
       updateBoardTags();
       logLine('SHYL-WJ86 在线模拟已启动。');
       logLine('已载入：' + exam.name);
