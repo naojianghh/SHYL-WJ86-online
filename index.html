@@ -133,6 +133,8 @@
     </div>
   </section>
 
+  <div class="splitter col-splitter" id="colSplitter" role="separator" aria-orientation="vertical" tabindex="0" title="拖动调节程序栏宽度，双击复位"></div>
+
   <aside class="panel side-panel">
     <nav class="tabbar" role="tablist">
       <button class="tab active" data-tab="code">程序</button>
@@ -151,6 +153,8 @@
           </select>
           <button class="btn small" id="btnOpen">打开 .ASM</button>
           <button class="btn small" id="btnSave">保存</button>
+          <button class="btn small" id="btnWrap" title="长行自动折行">折行</button>
+          <button class="btn small" id="btnFocus" title="放大 / 还原程序窗口">⤢ 放大</button>
           <input type="file" id="fileInput" accept=".asm,.txt,.inc" hidden>
         </div>
         <div class="editor-shell">
@@ -158,6 +162,7 @@
           <textarea id="editor" spellcheck="false" wrap="off" autocomplete="off" autocapitalize="off"></textarea>
         </div>
         <div class="errors" id="errors"></div>
+        <div class="splitter row-splitter" id="editorSplitter" role="separator" aria-orientation="horizontal" tabindex="0" title="拖动调节日志高度，双击复位"></div>
         <div class="console-block">
           <div class="console-head"><span>输出 / 日志</span><button class="link-btn" id="btnClearLog">清空</button></div>
           <pre id="console"></pre>
@@ -188,6 +193,14 @@
             <li>点右上角 <b>汇编并运行</b>（Ctrl+Enter）。</li>
             <li>看面板：数码管、LED、点阵、万用表、示波器会随程序变化。</li>
           </ol>
+
+          <h3>窗口布局</h3>
+          <ul>
+            <li>拖动实验箱面板与程序栏之间的竖直分隔条，调节程序栏宽度；双击复位。</li>
+            <li>拖动编辑器与输出日志之间的横条，调节日志高度；双击复位。</li>
+            <li>点“⤢ 放大”让程序栏占满窗口，按 Esc 或点“⤡ 还原”退出。</li>
+            <li>点“折行”让长汇编行自动换行，窄窗口下不用左右拖动。</li>
+          </ul>
 
           <h3>默认端口与接线</h3>
           <table class="help-table">

@@ -109,6 +109,10 @@
   let ledEls = [];
   let switchEls = [];
   let scopeCanvas, scopeCtx, scopeBaseSel;
+  let workspaceEl, sideEl, colSplitterEl, rowSplitterEl, consoleBlockEl, codePaneEl;
+  let layoutSide = 430, layoutConsole = 92;
+  let layoutWrap = false;
+  const LAYOUT_KEY = 'shyl.layout.v1';
 
   /* ------------------------------------------------------------------ */
   /* 构建面板                                                           */
@@ -322,6 +326,163 @@
         : (allPA ? 'L1 … L8 ← PA0…PA7'
           : '自由接线（在接线页逐路选择）')) + (w.invertLed ? '（低电平点亮）' : '');
     $('#matrix').classList.toggle('off', !w.matrixMode);
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* 可拖动布局                                                         */
+  /* ------------------------------------------------------------------ */
+  function clampSide(px) {
+    if (window.innerWidth <= 1180) {
+      return Math.round(Math.min(Math.max(px, 320), 700));
+    }
+    const max = Math.max(320, (workspaceEl ? workspaceEl.clientWidth : 1440) - 520);
+    return Math.round(Math.min(Math.max(px, 320), max));
+  }
+
+  function applySideWidth(px) {
+    layoutSide = clampSide(px);
+    document.documentElement.style.setProperty('--side-width', layoutSide + 'px');
+  }
+
+  function clampConsole(px) {
+    const h = codePaneEl && codePaneEl.clientHeight;
+    if (!h) return Math.round(Math.max(px, 48));
+    return Math.round(Math.min(Math.max(px, 48), Math.max(48, h - 300)));
+  }
+
+  function applyConsoleHeight(px) {
+    layoutConsole = clampConsole(px);
+    document.documentElement.style.setProperty('--console-height', layoutConsole + 'px');
+  }
+
+  function saveLayout() {
+    try {
+      localStorage.setItem(LAYOUT_KEY, JSON.stringify({
+        side: layoutSide, console: layoutConsole, wrap: layoutWrap
+      }));
+    } catch (e) { /* file:// 下可能禁用 localStorage */ }
+  }
+
+  function applyWrap(on) {
+    layoutWrap = !!on;
+    if (!editor) return;
+    editor.wrap = layoutWrap ? 'soft' : 'off';
+    editor.classList.toggle('wrap', layoutWrap);
+    const btn = $('#btnWrap');
+    if (btn) btn.classList.toggle('active', layoutWrap);
+    updateGutter();
+  }
+
+  function loadLayout() {
+    let hasStoredWrap = false;
+    try {
+      const raw = localStorage.getItem(LAYOUT_KEY);
+      if (raw) {
+        const v = JSON.parse(raw);
+        if (v && isFinite(v.side)) layoutSide = v.side;
+        if (v && isFinite(v.console)) layoutConsole = v.console;
+        if (v && typeof v.wrap === 'boolean') { layoutWrap = v.wrap; hasStoredWrap = true; }
+      }
+    } catch (e) { /* 使用默认值 */ }
+    // 窄窗口首次打开时默认折行，避免长行被截断
+    if (!hasStoredWrap && window.innerWidth <= 900) layoutWrap = true;
+    applySideWidth(layoutSide);
+    applyConsoleHeight(layoutConsole);
+    applyWrap(layoutWrap);
+  }
+
+  function startSplitDrag(e, kind) {
+    if (e.button !== undefined && e.button !== 0) return;
+    e.preventDefault();
+    const el = kind === 'col' ? colSplitterEl : rowSplitterEl;
+    document.body.classList.add('resizing', kind);
+    el.classList.add('dragging');
+    const startX = e.clientX, startY = e.clientY;
+    const startSide = layoutSide, startConsole = layoutConsole;
+
+    const onMove = ev => {
+      if (kind === 'col') applySideWidth(startSide + (startX - ev.clientX));
+      else applyConsoleHeight(startConsole + (startY - ev.clientY));
+    };
+    const onUp = () => {
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+      window.removeEventListener('pointercancel', onUp);
+      document.body.classList.remove('resizing', kind);
+      el.classList.remove('dragging');
+      saveLayout();
+    };
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
+    window.addEventListener('pointercancel', onUp);
+  }
+
+  function exitFocus() {
+    if (!workspaceEl.classList.contains('focus-code')) return;
+    workspaceEl.classList.remove('focus-code');
+    const btn = $('#btnFocus');
+    btn.textContent = '⤢ 放大';
+    btn.title = '放大 / 还原程序窗口';
+    applySideWidth(layoutSide);
+    applyConsoleHeight(layoutConsole);
+  }
+
+  function initSplitters() {
+    workspaceEl = $('.workspace');
+    sideEl = $('.side-panel');
+    colSplitterEl = $('#colSplitter');
+    rowSplitterEl = $('#editorSplitter');
+    consoleBlockEl = $('.console-block');
+    codePaneEl = $('#pane-code');
+
+    loadLayout();
+
+    colSplitterEl.addEventListener('pointerdown', e => startSplitDrag(e, 'col'));
+    rowSplitterEl.addEventListener('pointerdown', e => startSplitDrag(e, 'row'));
+    colSplitterEl.addEventListener('dblclick', () => { applySideWidth(430); saveLayout(); });
+    rowSplitterEl.addEventListener('dblclick', () => { applyConsoleHeight(92); saveLayout(); });
+
+    colSplitterEl.addEventListener('keydown', e => {
+      if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+      e.preventDefault();
+      applySideWidth(layoutSide + (e.key === 'ArrowLeft' ? 24 : -24));
+      saveLayout();
+    });
+    rowSplitterEl.addEventListener('keydown', e => {
+      if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return;
+      e.preventDefault();
+      applyConsoleHeight(layoutConsole + (e.key === 'ArrowDown' ? 24 : -24));
+      saveLayout();
+    });
+
+    $('#btnFocus').addEventListener('click', () => {
+      const on = workspaceEl.classList.toggle('focus-code');
+      const btn = $('#btnFocus');
+      btn.textContent = on ? '⤡ 还原' : '⤢ 放大';
+      btn.title = on ? '还原程序窗口' : '放大 / 还原程序窗口';
+      if (!on) {
+        applySideWidth(layoutSide);
+        applyConsoleHeight(layoutConsole);
+      }
+    });
+
+    $('#btnWrap').addEventListener('click', () => {
+      applyWrap(!layoutWrap);
+      saveLayout();
+    });
+
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape') exitFocus();
+    });
+
+    let resizeTimer = null;
+    window.addEventListener('resize', () => {
+      clearTimeout(resizeTimer);
+      resizeTimer = setTimeout(() => {
+        if (window.innerWidth > 1180) applySideWidth(layoutSide);
+        applyConsoleHeight(layoutConsole);
+      }, 80);
+    });
   }
 
   /* ------------------------------------------------------------------ */
@@ -721,6 +882,7 @@
     buildLeds();
     buildSwitches();
     buildWires();
+    initSplitters();
 
     sys.adc.volts[0] = 2.5;
     sys.onOutput = text => appendLog(text);
@@ -738,6 +900,7 @@
     // 标签页
     $$('.tab').forEach(tab => {
       tab.addEventListener('click', () => {
+        if (tab.dataset.tab !== 'code') exitFocus();
         $$('.tab').forEach(t => t.classList.toggle('active', t === tab));
         $$('.tabpane').forEach(p => p.classList.toggle('active', p.id === 'pane-' + tab.dataset.tab));
       });
