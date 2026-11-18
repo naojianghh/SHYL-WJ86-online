@@ -422,7 +422,7 @@
     workspaceEl.classList.remove('focus-code');
     const btn = $('#btnFocus');
     btn.textContent = '⤢ 放大';
-    btn.title = '放大 / 还原程序窗口';
+    btn.title = '放大 / 还原侧栏';
     applySideWidth(layoutSide);
     applyConsoleHeight(layoutConsole);
   }
@@ -459,7 +459,7 @@
       const on = workspaceEl.classList.toggle('focus-code');
       const btn = $('#btnFocus');
       btn.textContent = on ? '⤡ 还原' : '⤢ 放大';
-      btn.title = on ? '还原程序窗口' : '放大 / 还原程序窗口';
+      btn.title = on ? '还原侧栏' : '放大 / 还原侧栏';
       if (!on) {
         applySideWidth(layoutSide);
         applyConsoleHeight(layoutConsole);
@@ -900,7 +900,6 @@
     // 标签页
     $$('.tab').forEach(tab => {
       tab.addEventListener('click', () => {
-        if (tab.dataset.tab !== 'code') exitFocus();
         $$('.tab').forEach(t => t.classList.toggle('active', t === tab));
         $$('.tabpane').forEach(p => p.classList.toggle('active', p.id === 'pane-' + tab.dataset.tab));
       });

@@ -142,6 +142,7 @@
       <button class="tab" data-tab="chips">芯片</button>
       <button class="tab" data-tab="wire">接线</button>
       <button class="tab" data-tab="help">说明</button>
+      <button class="tab-focus" id="btnFocus" type="button" title="放大 / 还原侧栏">⤢ 放大</button>
     </nav>
 
     <div class="tabpanes">
@@ -154,7 +155,6 @@
           <button class="btn small" id="btnOpen">打开 .ASM</button>
           <button class="btn small" id="btnSave">保存</button>
           <button class="btn small" id="btnWrap" title="长行自动折行">折行</button>
-          <button class="btn small" id="btnFocus" title="放大 / 还原程序窗口">⤢ 放大</button>
           <input type="file" id="fileInput" accept=".asm,.txt,.inc" hidden>
         </div>
         <div class="editor-shell">
@@ -198,7 +198,7 @@
           <ul>
             <li>拖动实验箱面板与程序栏之间的竖直分隔条，调节程序栏宽度；双击复位。</li>
             <li>拖动编辑器与输出日志之间的横条，调节日志高度；双击复位。</li>
-            <li>点“⤢ 放大”让程序栏占满窗口，按 Esc 或点“⤡ 还原”退出。</li>
+            <li>点标签栏右侧的“⤢ 放大”，让当前标签页占满窗口；按 Esc 或点“⤡ 还原”退出。</li>
             <li>点“折行”让长汇编行自动换行，窄窗口下不用左右拖动。</li>
           </ul>
 
