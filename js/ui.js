@@ -9,11 +9,11 @@
 
   const SEG_LINES = [
     [10, 8, 46, 8],    // a
-    [48, 12, 48, 44],  // b
-    [48, 52, 48, 84],  // c
+    [48, 10, 48, 48],  // b
+    [48, 48, 48, 86],  // c
     [10, 88, 46, 88],  // d
-    [8, 52, 8, 84],    // e
-    [8, 12, 8, 44],    // f
+    [8, 48, 8, 86],    // e
+    [8, 10, 8, 48],    // f
     [10, 48, 46, 48]   // g
   ];
 
@@ -125,7 +125,7 @@
       const div = document.createElement('div');
       div.className = 'digit';
       const svg = document.createElementNS(SVGNS, 'svg');
-      svg.setAttribute('viewBox', '0 0 56 96');
+      svg.setAttribute('viewBox', '0 0 56 100');
       svg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
       const segs = [];
       SEG_LINES.forEach((p, i) => {
@@ -139,7 +139,7 @@
         segs.push(line);
       });
       const dp = document.createElementNS(SVGNS, 'circle');
-      dp.setAttribute('cx', '50'); dp.setAttribute('cy', '86'); dp.setAttribute('r', '3.4');
+      dp.setAttribute('cx', '50'); dp.setAttribute('cy', '96'); dp.setAttribute('r', '3.4');
       dp.setAttribute('class', 'dp');
       svg.appendChild(dp);
       div.appendChild(svg);
